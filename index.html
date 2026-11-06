@@ -2,18 +2,46 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WebGL Transformations</title>
+<style>
+  body { font-family: sans-serif; text-align: center; }
+  canvas { border: 1px solid black; max-width: 100%; }
+  .group { margin: 12px 0; }
+  .group h3 { margin: 6px 0; }
+  button { padding: 8px 14px; margin: 3px; font-size: 15px; cursor: pointer; }
+</style>
 </head>
 <body>
 <h2>Square Transformations</h2>
-<button onclick="moveSquare()">Translation</button>
-<button onclick="scale()">Scaling</button>
-<button onclick="rotate()">Rotation</button>
-<button onclick="reset()">Reset</button>
-<br><br>
-<canvas id="canvas" width="500" height="500"
-style="border:1px solid black;">
-</canvas>
+
+<canvas id="canvas" width="500" height="500"></canvas>
+
+<div class="group">
+  <h3>Translation</h3>
+  <button onclick="move(-0.2, 0)">&larr; Left</button>
+  <button onclick="move(0.2, 0)">Right &rarr;</button>
+  <button onclick="move(0, 0.2)">&uarr; Up</button>
+  <button onclick="move(0, -0.2)">Down &darr;</button>
+</div>
+
+<div class="group">
+  <h3>Scaling</h3>
+  <button onclick="scaleBy(1.2)">Bigger +</button>
+  <button onclick="scaleBy(1 / 1.2)">Smaller &minus;</button>
+</div>
+
+<div class="group">
+  <h3>Rotation</h3>
+  <button onclick="rotateBy(90)">90&deg;</button>
+  <button onclick="rotateBy(180)">180&deg;</button>
+  <button onclick="rotateBy(360)">360&deg;</button>
+</div>
+
+<div class="group">
+  <button onclick="reset()">Reset</button>
+</div>
+
 <script>
 // 1. Get Canvas and WebGL
 const canvas = document.getElementById("canvas");
@@ -77,20 +105,17 @@ gl.enableVertexAttribArray(position);
 const transformLocation = gl.getUniformLocation(program, "transform");
 
 // Transformation values
-let tx = 0, ty = 0;
-let sx = 1, sy = 1;
-let angle = 0;
+const state = { tx: 0, ty: 0, s: 1, angle: 0 }; // angle in radians
 
 // 10. Draw Square
 function draw() {
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
+  const c = Math.cos(state.angle);
+  const s = Math.sin(state.angle);
 
-  // Transformation Matrix
   const matrix = new Float32Array([
-    c * sx,  s * sx, 0,
-    -s * sy, c * sy, 0,
-    tx,      ty,     1
+    c * state.s,  s * state.s, 0,
+    -s * state.s, c * state.s, 0,
+    state.tx,     state.ty,    1
   ]);
 
   gl.uniformMatrix3fv(transformLocation, false, matrix);
@@ -100,39 +125,48 @@ function draw() {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-// 11. Translation
-function moveSquare() {
-  tx += 0.2;
-  ty += 0.1;
-  draw();
+// Smooth animation to a target state
+let animId = null;
+function animateTo(target, duration = 400) {
+  if (animId) cancelAnimationFrame(animId);
+  const from = { ...state };
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const e = t * (2 - t); // ease-out
+    for (const k in target) {
+      state[k] = from[k] + (target[k] - from[k]) * e;
+    }
+    draw();
+    if (t < 1) animId = requestAnimationFrame(step);
+  }
+  animId = requestAnimationFrame(step);
 }
 
-// 12. Scaling
-function scale() {
-  sx *= 1.2;
-  sy *= 1.2;
-  draw();
+// 11. Translation (left / right / up / down)
+function move(dx, dy) {
+  animateTo({ tx: state.tx + dx, ty: state.ty + dy, s: state.s, angle: state.angle });
 }
 
-// 13. Rotation
-function rotate() {
-  angle += Math.PI / 6;
-  draw();
+// 12. Scaling (bigger / smaller)
+function scaleBy(factor) {
+  animateTo({ tx: state.tx, ty: state.ty, s: state.s * factor, angle: state.angle });
+}
+
+// 13. Rotation (90 / 180 / 360 degrees)
+function rotateBy(deg) {
+  animateTo({ tx: state.tx, ty: state.ty, s: state.s, angle: state.angle + deg * Math.PI / 180 }, 600);
 }
 
 // 14. Reset
 function reset() {
-  tx = 0;
-  ty = 0;
-  sx = 1;
-  sy = 1;
-  angle = 0;
-  draw();
+  animateTo({ tx: 0, ty: 0, s: 1, angle: 0 });
 }
 
 // Initial drawing
 draw();
 </script>
+
 <footer style="margin-top:30px; text-align:center; font-family:sans-serif;">
   Devolved By
   <a href="https://kareem-mohamed-rust.vercel.app/" target="_blank" rel="noopener">Kareem Mohamed</a>
